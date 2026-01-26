@@ -1,0 +1,9 @@
+[submodule "sources/lineax"]
+	path = sources/lineax
+	url = https://github.com/patrick-kidger/lineax.git
+[submodule "sources/optimistix"]
+	path = sources/optimistix
+	url = https://github.com/patrick-kidger/optimistix.git
+[submodule "sources/diffrax"]
+	path = sources/diffrax
+	url = https://github.com/patrick-kidger/diffrax.git
