@@ -1,13 +1,40 @@
 # JAX Numerics Agent
 
-Guidance and artifacts for JAX/Equinox scientific computing.
+Practical guidance and artifacts for building reliable JAX/Equinox scientific
+computing code: design rules, best practices, checklists, and copy‑paste snippets.
 
-## Skills
-- `skills/jax_equinox_best_practices.md` — numerics‑focused JAX/Equinox patterns.
-- `skills/project_engineering.md` — API stability, documentation, pyproject, typing, CLI, CI.
+## What this is
+- A compact “front desk” for JAX/Equinox numerics conventions and engineering rules.
+- A synthesis of patterns from Equinox, Lineax, Optimistix, and Diffrax.
+- A toolkit to help humans or coding agents produce stable, performant, and testable
+  numerical code.
 
-## Checklists
-See `checklists/README.md` for the index.
+## What this is not
+- A library or framework.
+- A replacement for upstream docs. This repo points at patterns and codifies rules.
 
-## Snippets
-See `snippets/README.md` for a list of ready‑to‑paste examples.
+## How to use
+- Read `AGENTS.md` first for the hard rules and definitions.
+- Use the skills files for deeper guidance.
+- Use checklists for reviews and pre‑merge sanity checks.
+- Use snippets as minimal, correct starting points.
+
+## Project structure
+- `AGENTS.md` — non‑negotiable rules and definitions.
+- `skills/jax_equinox_best_practices.md` — numerics‑focused patterns (JIT, PyTrees, AD, RNG, stability).
+- `skills/project_engineering.md` — API stability, docs, pyproject, typing, CLI, CI, serialization.
+- `checklists/` — targeted checklists for design, JIT/static, numerics/AD/testing, linear algebra, engineering.
+- `snippets/` — ready‑to‑paste code templates.
+- `sources/` — scanned source codebases used to derive rules (read‑only).
+
+## Suggested entry points
+- New to the repo: `AGENTS.md`
+- Implementing a solver or optimizer: `skills/jax_equinox_best_practices.md`
+- Tightening engineering/CI: `skills/project_engineering.md`
+- Reviewing a PR: `checklists/README.md`
+- Starting code: `snippets/README.md`
+
+## Contributing
+- Keep guidance actionable and minimal.
+- Prefer DO/DON’T rules, then examples.
+- If you change a rule, update the relevant checklist.
