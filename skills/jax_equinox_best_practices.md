@@ -34,6 +34,8 @@ for general scientific/numerical computing in JAX + Equinox.
 - Don’t subclass or override concrete modules.
 - Don’t use global RNG state.
 
+Note: If you install skills globally with assets, checklists and snippets live under\n`~/.codex/skills/assets/` by default (or your chosen Codex home).
+
 ## JIT boundaries and static vs dynamic arguments
 
 ### Rule: JIT at the public boundary and keep configuration static

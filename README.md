@@ -19,6 +19,17 @@ computing code: design rules, best practices, checklists, and copy‑paste snipp
 - Use checklists for reviews and pre‑merge sanity checks.
 - Use snippets as minimal, correct starting points.
 
+## Install for Codex (global)
+If you want these skills available in every project, install them once into your
+Codex home directory (no project copies needed):
+
+```bash
+./scripts/install_skills.sh            # installs to ~/.codex/skills
+./scripts/install_skills.sh /path/to/codex/home
+./scripts/install_skills_with_assets.sh            # installs skills + assets
+./scripts/install_skills_with_assets.sh /path/to/codex/home
+```
+
 ## Project structure
 - `AGENTS.md` — non‑negotiable rules and definitions.
 - `skills/jax_equinox_best_practices.md` — numerics‑focused patterns (JIT, PyTrees, AD, RNG, stability).

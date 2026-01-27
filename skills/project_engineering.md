@@ -43,6 +43,11 @@ def solve(...):
 - Don’t: Leave runtime behavior implicit.
 - Why: Reproducibility depends on clear constraints.
 
+### Rule: Keep assets co‑located when installing globally
+- Do: If installing skills globally, place checklists/snippets in a known assets folder (e.g., `~/.codex/skills/assets/`).
+- Don’t: Reference repo‑local paths that won’t exist on other machines.
+- Why: Skills should remain self‑contained and portable across projects.
+
 ## pyproject.toml (project configuration)
 
 ### Rule: Centralize project metadata and tooling in `pyproject.toml`
