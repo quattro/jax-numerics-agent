@@ -7,8 +7,7 @@ import optimistix as optx
 # Global functions only: no closed-over JAX arrays.
 
 def fn_primal(inputs):
-    y, a = inputs
-    # Example: solve y^2 = a for y (pick positive branch)
+    _, a = inputs  # First element unused; we solve for root such that root^2 = a
     root = jnp.sqrt(a)
     residual = root * root - a
     return root, residual
@@ -16,7 +15,7 @@ def fn_primal(inputs):
 
 def fn_rewrite(root, residual, inputs):
     # Rewrite whose Jacobian w.r.t. root is used by implicit JVP
-    y, a = inputs
+    _, a = inputs
     return root * root - a
 
 

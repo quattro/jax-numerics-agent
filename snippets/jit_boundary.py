@@ -10,7 +10,10 @@ class Config(eqx.Module):
 @eqx.filter_jit
 def solve(fn, y0, args, cfg: Config):
     """Public JIT boundary: static config, dynamic arrays."""
-    return fn(y0, args)
+    # cfg.rtol and cfg.max_steps are static; traced only once per unique config
+    result = fn(y0, args)
+    # Example: scale result by rtol (static scalar folds into the graph)
+    return result * cfg.rtol
 
 
 def fn(y, args):
