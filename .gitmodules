@@ -7,3 +7,6 @@
 [submodule "sources/diffrax"]
 	path = sources/diffrax
 	url = https://github.com/patrick-kidger/diffrax.git
+[submodule "sources/equinox"]
+	path = sources/equinox
+	url = https://github.com/patrick-kidger/equinox.git
