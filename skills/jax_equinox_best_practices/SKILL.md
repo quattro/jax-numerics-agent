@@ -34,7 +34,8 @@ for general scientific/numerical computing in JAX + Equinox.
 - Don’t subclass or override concrete modules.
 - Don’t use global RNG state.
 
-Note: If you install skills globally with assets, checklists and snippets live under\n`~/.codex/skills/assets/` by default (or your chosen Codex home).
+Note: If you install skills globally with assets, checklists and snippets live under
+`~/.codex/skills/assets/` by default (or your chosen Codex home).
 
 ## JIT boundaries and static vs dynamic arguments
 
@@ -356,4 +357,4 @@ def run(x, cfg: Config):
 ## See also: project engineering
 
 For API stability, CI gates, documentation style, type checking, CLI patterns, and
-serialization guidance, see `skills/project_engineering.md`.
+serialization guidance, see `skills/project_engineering/SKILL.md`.

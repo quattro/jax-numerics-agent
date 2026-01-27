@@ -1,3 +1,10 @@
+---
+name: project-engineering
+description: Engineering rules for JAX/Equinox scientific computing; API stability, docs, CI, serialization.
+metadata:
+  short-description: Project engineering
+---
+
 # Project Engineering (JAX/Equinox Scientific Computing)
 
 Guidance for software engineering practices around numerical/JAX codebases.

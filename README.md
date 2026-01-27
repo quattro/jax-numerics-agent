@@ -32,16 +32,16 @@ Codex home directory (no project copies needed):
 
 ## Project structure
 - `AGENTS.md` — non‑negotiable rules and definitions.
-- `skills/jax_equinox_best_practices.md` — numerics‑focused patterns (JIT, PyTrees, AD, RNG, stability).
-- `skills/project_engineering.md` — API stability, docs, pyproject, typing, CLI, CI, serialization.
+- `skills/jax_equinox_best_practices/SKILL.md` — numerics‑focused patterns (JIT, PyTrees, AD, RNG, stability).
+- `skills/project_engineering/SKILL.md` — API stability, docs, pyproject, typing, CLI, CI, serialization.
 - `checklists/` — targeted checklists for design, JIT/static, numerics/AD/testing, linear algebra, engineering.
 - `snippets/` — ready‑to‑paste code templates.
 - `sources/` — scanned source codebases used to derive rules (read‑only).
 
 ## Suggested entry points
 - New to the repo: `AGENTS.md`
-- Implementing a solver or optimizer: `skills/jax_equinox_best_practices.md`
-- Tightening engineering/CI: `skills/project_engineering.md`
+- Implementing a solver or optimizer: `skills/jax_equinox_best_practices/SKILL.md`
+- Tightening engineering/CI: `skills/project_engineering/SKILL.md`
 - Reviewing a PR: `checklists/README.md`
 - Starting code: `snippets/README.md`
 
