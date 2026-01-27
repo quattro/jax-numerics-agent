@@ -1,3 +1,10 @@
+---
+name: project-engineering
+description: Use for software engineering practices around JAX/Equinox numerical codebases; covers API stability, documentation, pyproject, typing, CLI, and CI.
+metadata:
+  short-description: Project engineering for JAX/Equinox
+---
+
 # Project Engineering (JAX/Equinox Scientific Computing)
 
 Guidance for software engineering practices around numerical/JAX codebases.
