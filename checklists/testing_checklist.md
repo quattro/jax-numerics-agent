@@ -11,6 +11,8 @@ Use this to validate correctness, AD, and batching behavior.
 ## Correctness
 - [ ] Compare against known solutions for small problems.
 - [ ] Validate result codes with `throw=False` where applicable.
+- [ ] Validate `throw=True` escalation behavior where applicable.
+- [ ] For vmapped solves, verify expected failure semantics (`throw=True` batch-fails vs `throw=False` per-item `result` inspection).
 - [ ] Include singular/ill-conditioned and nonfinite cases.
 
 ## AD checks

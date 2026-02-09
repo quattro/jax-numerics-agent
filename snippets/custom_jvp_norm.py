@@ -2,6 +2,7 @@ import jax
 import jax.numpy as jnp
 
 
+# Array-only example. For mixed PyTrees/Modules, prefer eqx.filter_custom_jvp.
 @jax.custom_jvp
 def stable_norm(x):
     return jnp.sqrt(jnp.sum(x * x))

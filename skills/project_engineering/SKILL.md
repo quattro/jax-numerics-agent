@@ -9,6 +9,42 @@ metadata:
 
 Guidance for software engineering practices around numerical/JAX codebases.
 
+## Companion checklists
+
+Apply these checklists when using this skill.
+
+### Repo-local paths
+- `checklists/project_engineering_checklist.md`
+- `checklists/testing_checklist.md`
+
+### Global install paths (`scripts/install_skills_with_assets.sh`)
+- `~/.codex/skills/assets/checklists/project_engineering_checklist.md`
+- `~/.codex/skills/assets/checklists/testing_checklist.md`
+
+## Checklist workflow
+- Before implementation: open the relevant companion checklist(s) and scope the work against them.
+- During implementation: keep checklist items aligned with code/design decisions.
+- Before completion: re-run the checklist and explicitly document any intentionally unchecked item.
+
+## Companion snippets
+
+Use these snippets as implementation starters when they match the task.
+
+### Repo-local paths
+- `snippets/cli_skeleton.py`
+- `snippets/pyproject_minimal.toml`
+- `snippets/test_jvp_finite_difference.py`
+
+### Global install paths (`scripts/install_skills_with_assets.sh`)
+- `~/.codex/skills/assets/snippets/cli_skeleton.py`
+- `~/.codex/skills/assets/snippets/pyproject_minimal.toml`
+- `~/.codex/skills/assets/snippets/test_jvp_finite_difference.py`
+
+## Snippet workflow
+- Before implementation: start from the closest snippet and align it with repository conventions.
+- During implementation: keep public API shape, docs style, and error semantics consistent with this skill.
+- Before completion: remove placeholders and verify snippet-derived code is fully integrated.
+
 ## Public API stability
 
 ### Rule: Keep API structure stable and explicit
@@ -50,6 +86,11 @@ class Solution(eqx.Module):
 - Don’t: Subclass or override concrete modules.
 - Why: Aligns with Equinox abstract‑or‑final pattern and avoids override ambiguity.
 
+### Rule: Prefer Lineax/Optimistix primitives over bespoke solver kernels
+- Do: Build linear/nonlinear solver APIs on top of `lineax.linear_solve` and `optimistix` entry points (`root_find`, `least_squares`, `minimise`) when they fit.
+- Don’t: Reimplement generic solver loops unless introducing a genuinely new algorithm.
+- Why: Reuses mature result semantics (`Solution`, `RESULTS`, `throw`) and reduces maintenance risk.
+
 ## Documentation
 
 ### Rule: Match repository docstring style
@@ -73,15 +114,22 @@ def solve(...):
 - Don’t: Leave runtime behavior implicit.
 - Why: Reproducibility depends on clear constraints.
 
+### Rule: Document `throw` behavior across transforms and backends
+- Do: Document how `throw=True` behaves under batching (`vmap`) and any backend caveats for runtime errors.
+- Don’t: Assume identical exception behavior on CPU/GPU/TPU or per-batch isolation.
+- Why: Error propagation can differ by backend, and `vmap` can fail the whole batch.
+
 ### Rule: Preserve enum compatibility with deprecations
-- Do: Keep deprecated `RESULTS` members with warnings on access and a removal plan.
+- Do: Keep deprecated `RESULTS` members with warnings on access and a removal plan; prefer compatibility aliases over silent removal.
+- Do: Extend enums compatibly (e.g., subclassing and promotion) when adding domain-specific result codes.
 - Don’t: Remove or rename enum members without a deprecation window.
 - Why: Result enums are part of the public API contract.
 
-### Rule: Keep assets co‑located when installing globally
-- Do: If installing skills globally, place checklists/snippets in a known assets folder (e.g., `~/.codex/skills/assets/`).
+### Rule: [Local policy] Keep assets co‑located when installing globally
+- Do: In this Codex skill repo, place checklists/snippets in a known assets folder (e.g., `~/.codex/skills/assets/`).
 - Don’t: Reference repo‑local paths that won’t exist on other machines.
 - Why: Skills should remain self‑contained and portable across projects.
+- Note: This is a local packaging convention for this project, not an upstream JAX/Equinox library rule.
 
 ## pyproject.toml (project configuration)
 
@@ -108,6 +156,7 @@ typeCheckingMode = "strict"
 
 ### Rule: Pin minimum versions for core scientific deps
 - Do: Set lower bounds for JAX/Equinox/jaxtyping and note compatibility.
+- Do: Add explicit exclusions for known-bad versions when needed (e.g., `jax>=...,!=x.y.z`).
 - Don’t: Allow unconstrained upgrades that silently change semantics.
 - Why: Numerical stability and API behavior change across versions.
 
@@ -180,6 +229,9 @@ if __name__ == "__main__":
 - Example:
 ```python
 if throw:
-    value, result, stats = result.error_if((value, result, stats), result != RESULTS.successful)
+    sol = result.error_if(sol, sol.result != RESULTS.successful)
+
+if throw:
+    value, status, stats = result.error_if((value, status, stats), status != RESULTS.successful)
 ```
 - Allowed break: Non-jitted debugging utilities.

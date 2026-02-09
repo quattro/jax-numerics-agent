@@ -14,9 +14,15 @@ Use this for solver implementation and verification.
 - [ ] PyTree-shaped randomness uses split-by-tree helpers.
 
 ## Custom AD
-- [ ] Custom JVP/VJP is used for implicit/iterative methods where needed.
+- [ ] For mixed PyTrees/Modules, custom AD uses `eqx.filter_custom_jvp`/`eqx.filter_custom_vjp`.
+- [ ] JVP/VJP calls on PyTree inputs use `eqx.filter_jvp`/`eqx.filter_vjp`.
+- [ ] Tangent-path solves use `throw=True` when failures cannot be returned through a result channel.
 - [ ] Custom primitives include abstract_eval + JVP + transpose.
-- [ ] Nondifferentiable config/state is guarded (`eqx.nondifferentiable`).
+- [ ] Nondifferentiable state/options/metadata are guarded (`eqxi.nondifferentiable` / `eqxi.nondifferentiable_backward`).
+
+## Memory and callbacks
+- [ ] Long iterative pipelines consider `eqx.filter_checkpoint` when memory-bound.
+- [ ] Host callbacks on mixed PyTrees use `eqx.filter_pure_callback`.
 
 ## Testing
 - [ ] JIT + vmap + grad are exercised in tests.

@@ -9,13 +9,24 @@ Use this for linear solves, least squares, Jacobian operators, and preconditioni
 
 ## Shape/structure
 - [ ] Vector and operator structures match (PyTree shape/dtype compatible).
-- [ ] Use `jax.eval_shape`/`ShapeDtypeStruct` to validate structure early.
+- [ ] Use `eqx.filter_eval_shape` for mixed PyTrees and `jax.eval_shape` for array-only structures.
 - [ ] Keep operator input/output structures static.
 
 ## Solver configuration
 - [ ] Choose solver based on conditioning and matrix structure.
 - [ ] Handle under/overdetermined systems explicitly (least-squares/min-norm).
 - [ ] Expose tolerances (`rtol`, `atol`) and max-iteration controls.
+
+## Lineax linear solves
+- [ ] Model systems as `lineax.AbstractLinearOperator` and solve with `lineax.linear_solve`.
+- [ ] Choose `AutoLinearSolver(well_posed=...)` intentionally (or document explicit concrete solver choice).
+- [ ] Treat operator tags as contracts and only apply tags guaranteed by construction.
+- [ ] Handle solver outcomes explicitly (`throw=False` + `sol.result` for recoverable flows; `throw=True` for fail-fast paths).
+
+## Optimistix nonlinear solves
+- [ ] Use `optimistix` entry points (`root_find`, `least_squares`, `minimise`) with explicit solver objects.
+- [ ] Pass problem structure via `has_aux`, `tags`, and solver options instead of hidden closure state.
+- [ ] Handle nonlinear failures explicitly (`throw=False` + `sol.result` in recoverable flows; `throw=True` in strict flows).
 
 ## Numerical stability
 - [ ] Guard ill-conditioned solves with scaling or regularization.

@@ -14,7 +14,7 @@ computing code: design rules, best practices, checklists, and copy‑paste snipp
 - A replacement for upstream docs. This repo points at patterns and codifies rules.
 
 ## How to use
-- Read `AGENTS.md` first for the hard rules and definitions.
+- Read `AGENTS.md` first for bootstrap guidance and source-of-truth pointers.
 - Use the skills files for deeper guidance.
 - Use checklists for reviews and pre‑merge sanity checks.
 - Use snippets as minimal, correct starting points.
@@ -31,7 +31,7 @@ Codex home directory (no project copies needed):
 ```
 
 ## Project structure
-- `AGENTS.md` — non‑negotiable rules and definitions.
+- `AGENTS.md` — bootstrap entrypoint and source-of-truth pointers.
 - `skills/jax_equinox_best_practices/SKILL.md` — numerics‑focused patterns (JIT, PyTrees, AD, RNG, stability).
 - `skills/project_engineering/SKILL.md` — API stability, docs, pyproject, typing, CLI, CI, serialization.
 - `checklists/` — targeted checklists for design, JIT/static, numerics/AD/testing, linear algebra, engineering.
@@ -48,4 +48,6 @@ Codex home directory (no project copies needed):
 ## Contributing
 - Keep guidance actionable and minimal.
 - Prefer DO/DON’T rules, then examples.
-- If you change a rule, update the relevant checklist.
+- If you change a skill rule, update the corresponding checklist and companion snippet references.
+- Keep `skills/*/SKILL.md` references to `checklists/*` and `snippets/*` valid.
+- Run `./scripts/validate_skill_links.sh` before opening a PR (CI also enforces this).

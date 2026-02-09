@@ -1,6 +1,6 @@
 ---
 name: jax-equinox-numerics
-description: Use for any JAX + Equinox numerics project; repo-agnostic patterns plus a checklist to align with local style.
+description: Use for any JAX + Equinox numerics project; repo-agnostic patterns plus companion checklists to align with local style.
 metadata:
   short-description: JAX/Equinox numerics
 ---
@@ -9,6 +9,60 @@ metadata:
 
 This playbook distills recurring patterns from the scanned repos into reusable rules
 for general scientific/numerical computing in JAX + Equinox.
+
+## Companion checklists
+
+Apply these checklists when using this skill.
+
+### Repo-local paths
+- `checklists/jax_equinox_design_checklist.md`
+- `checklists/jit_static_pytree_checklist.md`
+- `checklists/numerics_ad_testing_checklist.md`
+- `checklists/linear_algebra_checklist.md`
+
+### Global install paths (`scripts/install_skills_with_assets.sh`)
+- `~/.codex/skills/assets/checklists/jax_equinox_design_checklist.md`
+- `~/.codex/skills/assets/checklists/jit_static_pytree_checklist.md`
+- `~/.codex/skills/assets/checklists/numerics_ad_testing_checklist.md`
+- `~/.codex/skills/assets/checklists/linear_algebra_checklist.md`
+
+## Checklist workflow
+- Before implementation: open the relevant companion checklist(s) and scope the work against them.
+- During implementation: keep checklist items aligned with code/design decisions.
+- Before completion: re-run the checklist and explicitly document any intentionally unchecked item.
+
+## Companion snippets
+
+Use these snippets as implementation starters when they match the task.
+
+### Repo-local paths
+- `snippets/jit_boundary.py`
+- `snippets/partition_static_state.py`
+- `snippets/filter_vmap_batching.py`
+- `snippets/prng_split_by_tree.py`
+- `snippets/filter_cond_static.py`
+- `snippets/linear_operator_pattern.py`
+- `snippets/custom_jvp_norm.py`
+- `snippets/implicit_jvp.py`
+- `snippets/test_jvp_finite_difference.py`
+- `snippets/abc_module_pattern.py`
+
+### Global install paths (`scripts/install_skills_with_assets.sh`)
+- `~/.codex/skills/assets/snippets/jit_boundary.py`
+- `~/.codex/skills/assets/snippets/partition_static_state.py`
+- `~/.codex/skills/assets/snippets/filter_vmap_batching.py`
+- `~/.codex/skills/assets/snippets/prng_split_by_tree.py`
+- `~/.codex/skills/assets/snippets/filter_cond_static.py`
+- `~/.codex/skills/assets/snippets/linear_operator_pattern.py`
+- `~/.codex/skills/assets/snippets/custom_jvp_norm.py`
+- `~/.codex/skills/assets/snippets/implicit_jvp.py`
+- `~/.codex/skills/assets/snippets/test_jvp_finite_difference.py`
+- `~/.codex/skills/assets/snippets/abc_module_pattern.py`
+
+## Snippet workflow
+- Before implementation: pick a matching snippet and adapt names/signatures to your API.
+- During implementation: keep semantics aligned with this skill's rules and your chosen checklist(s).
+- Before completion: remove stale placeholder code and verify the adapted snippet still satisfies invariants.
 
 ## Definitions (strict)
 - JIT boundary: the public API function wrapped with `eqx.filter_jit`/`jax.jit`.
@@ -181,22 +235,24 @@ state = eqx.combine(state_static, new_dyn)
 ```
 - Allowed break: Only outside JIT with an explicit re-jit boundary.
 
-### Rule: Use `eqx.filter_eval_shape` for structure checks
-- Do: Compare structures via `eqx.filter_eval_shape`/`ShapeDtypeStruct`.
+### Rule: Use the right shape-eval tool for structure checks
+- Do: Use `eqx.filter_eval_shape` for mixed PyTrees (arrays + non-arrays), and `jax.eval_shape` for array-only structures.
 - Don’t: Infer structure from runtime values inside JIT.
 - Why: Structure checks must not execute numerics.
 - Example:
 ```python
 import equinox as eqx
+import jax
 import jax.tree_util as jtu
 
-struct = eqx.filter_eval_shape(lambda: y)
+struct = eqx.filter_eval_shape(lambda: (y, {"meta": "x"}))
+arr_struct = jax.eval_shape(lambda: y)
 assert jtu.tree_structure(struct) == jtu.tree_structure(expected_struct)
 ```
 - Allowed break: Small non-jitted utilities.
 
 ### Rule: Avoid dummy arrays for structure checks
-- Do: Use `eqx.filter_eval_shape` instead of fabricated inputs.
+- Do: Use shape-eval (`eqx.filter_eval_shape` or `jax.eval_shape`) instead of fabricated inputs.
 - Don’t: Construct fake arrays just to discover shapes/dtypes.
 - Why: Avoids accidental device work and keeps structure checks pure.
 - Allowed break: Tiny scripts outside JIT.
@@ -251,16 +307,22 @@ batched_solve = eqx.filter_vmap(solve, in_axes=(None, eqx.if_array(0), None))
 ```
 - Allowed break: When the entire module is intentionally batched.
 
-### Rule: Prefer `eqx.filter_jit` with sharded inputs over `filter_pmap`
-- Do: Use sharded inputs with `eqx.filter_jit` for most parallelism.
+### Rule: Prefer `eqx.filter_jit` + `eqx.filter_shard` over `filter_pmap`
+- Do: Use sharded inputs/constraints with `eqx.filter_jit` and `eqx.filter_shard` for most parallelism.
 - Don’t: Reach for `filter_pmap` unless you need pmap-specific behavior.
 - Why: Equinox now recommends JIT + sharding for most cases.
 - Example:
 ```python
 import equinox as eqx
+import jax
+import jax.sharding as jshard
+
+mesh = jax.make_mesh((num_devices,), ("batch",))
+data_sharding = jshard.NamedSharding(mesh, jshard.PartitionSpec("batch"))
 
 @eqx.filter_jit
 def step(state, batch):
+    batch = eqx.filter_shard(batch, data_sharding)
     ...
 ```
 - Allowed break: Existing `pmap`-based code or explicit `axis_name` collectives.
@@ -341,9 +403,24 @@ value, tangents = eqx.filter_jvp(f, (x,), (tx,))
 - Why: There is no result channel for tangent failures.
 - Example:
 ```python
-value, result, stats = linear_solve(..., throw=True)
+import lineax as lx
+
+sol = lx.linear_solve(op, b, throw=True)
 ```
 - Allowed break: Explicitly tested research prototypes.
+
+### Rule: Mark solver metadata as nondifferentiable
+- Do: Use `eqxi.nondifferentiable` for solver state/options and `eqxi.nondifferentiable_backward` for stats/metadata outputs.
+- Don’t: Let AD flow through control metadata unless that is intentional.
+- Why: Prevents invalid cotangents and unstable gradients through non-optimization state.
+- Example:
+```python
+import equinox.internal as eqxi
+
+state = eqxi.nondifferentiable(state, name="solver state")
+stats = eqxi.nondifferentiable_backward(stats)
+```
+- Allowed break: Research code intentionally differentiating through metadata.
 
 ### Rule: Use `eqx.filter_checkpoint` for long iterative pipelines
 - Do: Add `eqx.filter_checkpoint` in long iterative pipelines (e.g., scans) to trade compute for memory.
@@ -380,10 +457,103 @@ with jax.ensure_compile_time_eval():
 ```python
 import equinox as eqx
 
-out = eqx.filter_pure_callback(fn, result_shape, arg)
+out = eqx.filter_pure_callback(fn, arg, result_shape_dtypes=result_shape)
 ```
 - Allowed break: Pure JAX array-only callbacks.
 - Note: Avoid callbacks in transforms/backends that disallow them (e.g. some `jit`/`pmap`/`grad` contexts).
+
+## Lineax solver patterns
+
+### Rule: Model linear systems with Lineax operators and `linear_solve`
+- Do: Represent systems as `AbstractLinearOperator` (`MatrixLinearOperator`, `FunctionLinearOperator`, `JacobianLinearOperator`) and call `lx.linear_solve`.
+- Don’t: Materialize inverses (`jnp.linalg.inv(A) @ b`) in hot paths.
+- Why: Preserves operator structure, improves numerical stability, and returns structured `Solution` + `RESULTS`.
+- Example:
+```python
+import lineax as lx
+
+op = lx.MatrixLinearOperator(matrix)
+sol = lx.linear_solve(op, b, solver=lx.AutoLinearSolver(well_posed=True), throw=False)
+```
+- Allowed break: Tiny, one-off dense systems outside performance-critical code.
+
+### Rule: Choose `AutoLinearSolver(well_posed=...)` intentionally
+- Do: Keep `well_posed=True` for square nonsingular systems; set `well_posed=False` for least-squares/min-norm problems.
+- Don’t: Depend on accidental behavior for under/overdetermined systems.
+- Why: Solver selection and failure semantics depend on this contract.
+- Example:
+```python
+solver = lx.AutoLinearSolver(well_posed=False)  # least-squares / min-norm settings
+sol = lx.linear_solve(op, b, solver=solver, throw=False)
+```
+- Allowed break: Explicitly chosen concrete solvers when you already know matrix structure.
+
+### Rule: Treat Lineax tags as trusted contracts
+- Do: Attach tags (e.g. symmetric/PSD/triangular) only when guaranteed by construction.
+- Don’t: Add tags speculatively to chase speed.
+- Why: Incorrect tags can silently return wrong answers.
+- Example:
+```python
+op = lx.MatrixLinearOperator(matrix, lx.positive_semidefinite_tag)
+```
+- Allowed break: None for production code; validate first in exploratory work.
+
+### Rule: Use `throw`/`result` deliberately in linear solves
+- Do: Use `throw=False` in recoverable or batched flows and branch on `sol.result`; use `throw=True` when fail-fast is required.
+- Don’t: Ignore non-success result codes.
+- Why: Keeps batch behavior and error handling predictable.
+- Example:
+```python
+sol = lx.linear_solve(op, b, throw=False)
+if sol.result != lx.RESULTS.successful:
+    ...
+```
+- Allowed break: Strict scripts/tests where immediate failure is preferable.
+
+## Optimistix nonlinear solve patterns
+
+### Rule: Use Optimistix entry points for nonlinear solves
+- Do: Express problems via `optx.root_find`, `optx.least_squares`, or `optx.minimise` with explicit solver objects.
+- Don’t: Hand-roll nonlinear solver loops unless you are implementing a new method.
+- Why: You get consistent `Solution` structure, adjoint integration, and failure reporting.
+- Example:
+```python
+import optimistix as optx
+
+sol = optx.root_find(fn, optx.Newton(rtol=1e-6, atol=1e-9), y0, throw=False)
+```
+- Allowed break: Novel research algorithms that are not covered by existing solvers.
+
+### Rule: Pass problem structure through `has_aux`, `tags`, and options
+- Do: Use `has_aux=True` for auxiliary outputs and provide Lineax tags/options when solver/adjoint can exploit Jacobian structure.
+- Don’t: Hide structure in closures or ad-hoc global state.
+- Why: Improves solver robustness and performance without changing API shape.
+- Example:
+```python
+import lineax as lx
+import optimistix as optx
+
+sol = optx.root_find(fn, solver, y0, has_aux=True, tags=frozenset({lx.symmetric_tag}))
+```
+- Allowed break: Simple scalar problems where structure hints are irrelevant.
+
+### Rule: Handle nonlinear failures with `throw` + `sol.result`
+- Do: Use `throw=False` for recoverable failures and inspect `sol.result`; use `throw=True` for strict paths.
+- Don’t: Assume convergence by default.
+- Why: Nonlinear methods can legitimately fail; explicit handling avoids silent degradation.
+- Example:
+```python
+sol = optx.least_squares(fn, solver, y0, throw=False)
+if sol.result != optx.RESULTS.successful:
+    ...
+```
+- Allowed break: Unit tests that intentionally require immediate failure on non-success.
+
+### Rule: Reserve semi-public internals for library-level extensions
+- Do: Use advanced internals (`eqxi.filter_primitive_*`, nontraceable checks, custom adjoint plumbing) only when building solver libraries.
+- Don’t: Expose semi-public internals as stable end-user APIs.
+- Why: Internal APIs are powerful but can change across versions.
+- Allowed break: Controlled internal codebases with pinned versions and dedicated maintenance.
 
 ## Numerical stability and dtype policy
 
@@ -427,24 +597,25 @@ x = eqx.error_if(x, ~jnp.isfinite(x), "nonfinite")
 ## Custom JVP/VJP patterns
 
 ### Rule: Use custom JVP/VJP for implicit or iterative methods
-- Do: Implement custom JVP/VJP when autodiff is unstable or too costly.
+- Do: Implement custom JVP/VJP (preferably with Equinox wrappers) when autodiff is unstable or too costly.
 - Don’t: Rely on default AD for ill-conditioned solves.
 - Why: Improves stability and performance.
 - Example:
 ```python
-import jax
+import equinox as eqx
+import jax.numpy as jnp
 
-@jax.custom_jvp
+@eqx.filter_custom_jvp
 def stable_norm(x):
     return jnp.sqrt(jnp.sum(x * x))
 
-@stable_norm.defjvp
+@stable_norm.def_jvp
 def _jvp(primals, tangents):
     (x,), (tx,) = primals, tangents
     y = stable_norm(x)
     return y, jnp.where(y == 0, 0.0, jnp.vdot(x, tx) / y)
 ```
-- Allowed break: Small, well-behaved problems where default AD is fine.
+- Allowed break: Array-only functions can use `jax.custom_jvp`/`jax.custom_vjp`.
 
 ### Rule: For custom primitives, implement abstract_eval + JVP + transpose
 - Do: Provide full AD rules and guard nondiff data.
