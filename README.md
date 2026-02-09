@@ -61,6 +61,21 @@ ls ~/.codex/skills/assets/checklists ~/.codex/skills/assets/snippets
 - `snippets/` — ready‑to‑paste code templates.
 - `sources/` — scanned source codebases used to derive rules (read‑only).
 
+## Submodule update policy for `sources/`
+
+The `sources/` directory is a read-only mirror of upstream repositories managed
+as git submodules. Do not edit files under `sources/` directly.
+
+Use this workflow when you need to refresh mirrored references:
+
+```bash
+git submodule update --init --recursive
+git submodule update --remote --recursive
+```
+
+When a submodule version is intentionally updated, include the submodule pointer
+change in the same PR and call out the upstream commit(s) in the PR summary.
+
 ## Suggested entry points
 - New to the repo: `AGENTS.md`
 - Implementing a solver or optimizer: `skills/jax_equinox_best_practices/SKILL.md`
