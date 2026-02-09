@@ -22,6 +22,29 @@ return Solution(value=out, result=result, stats=stats, state=state)
 ```
 - Allowed break: Major version bump with migration guide.
 
+### Rule: Use structured results with a `RESULTS` enum and `Solution` container
+- Do: Define a `RESULTS` enum with human-readable messages and return a typed `Solution`.
+- Don’t: Return ad-hoc tuples or raise exceptions by default.
+- Why: Callers can handle failures deterministically and inspect stats/state.
+- Example:
+```python
+class RESULTS(eqxi.Enumeration):
+    successful = ""
+    max_steps_reached = "The maximum number of steps was reached."
+
+class Solution(eqx.Module):
+    value: PyTree[Array]
+    result: RESULTS
+    stats: dict[str, PyTree[ArrayLike]]
+    state: PyTree[Any]
+```
+- Allowed break: Tiny internal helpers that are not part of the public API.
+
+### Rule: Treat `RESULTS` messages as the canonical error UX
+- Do: Write actionable, user-facing messages on each non-success result.
+- Don’t: Leave messages empty or force users to decode numeric codes.
+- Why: Users rely on `RESULTS[...]` for guidance without digging into code.
+
 ### Rule: Prefer composition over subclassing for concrete Modules
 - Do: Wrap and delegate when customizing behavior.
 - Don’t: Subclass or override concrete modules.
@@ -49,6 +72,11 @@ def solve(...):
 - Do: Explain nondeterminism across devices/backends and list expected failure results.
 - Don’t: Leave runtime behavior implicit.
 - Why: Reproducibility depends on clear constraints.
+
+### Rule: Preserve enum compatibility with deprecations
+- Do: Keep deprecated `RESULTS` members with warnings on access and a removal plan.
+- Don’t: Remove or rename enum members without a deprecation window.
+- Why: Result enums are part of the public API contract.
 
 ### Rule: Keep assets co‑located when installing globally
 - Do: If installing skills globally, place checklists/snippets in a known assets folder (e.g., `~/.codex/skills/assets/`).
@@ -144,3 +172,14 @@ if __name__ == "__main__":
 - Do: Store a version tag and validate on load.
 - Don’t: Persist opaque state without compatibility notes.
 - Why: Long‑running experiments need stable restore paths.
+
+### Rule: Support `throw`-style error escalation using `result.error_if`
+- Do: Expose a `throw` flag and use `result.error_if` to raise inside JIT when desired.
+- Don’t: Raise Python exceptions inside jitted code paths.
+- Why: Keeps error handling consistent with `RESULTS` while still allowing hard failures.
+- Example:
+```python
+if throw:
+    value, result, stats = result.error_if((value, result, stats), result != RESULTS.successful)
+```
+- Allowed break: Non-jitted debugging utilities.

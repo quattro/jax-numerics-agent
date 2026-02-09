@@ -58,6 +58,33 @@ def solve(fn, y0, args, solver: Solver):
 ```
 - Allowed break: Debug/prototype code or Python-only inputs.
 
+### Rule: Prefer `eqx.filter_jit` for mixed PyTrees and Modules
+- Do: Use `eqx.filter_jit` when inputs include Modules or PyTrees with static leaves.
+- Don’t: Use raw `jax.jit` and manually manage `static_argnums` for complex PyTrees.
+- Why: Equinox automatically treats non-arrays as static at the leaf level.
+- Example:
+```python
+import equinox as eqx
+
+@eqx.filter_jit
+def step(model, x):
+    return model(x)
+```
+- Allowed break: Pure array-only functions.
+
+### Rule: Guard against closed-over JAX arrays with `eqxi.nontraceable`
+- Do: Use `eqxi.nontraceable` when you must ensure no closed-over tracers leak across boundaries.
+- Don’t: Allow implicit captures of JAX arrays in closures passed into solvers/operators.
+- Why: Prevents subtle tracer leaks and undefined behavior under JIT/AD.
+- Example:
+```python
+import equinox.internal as eqxi
+
+out = eqxi.nontraceable(out, name="solve w.r.t. closed-over value")
+```
+- Allowed break: Pure-Python closures with no JAX arrays.
+- Note: This is an internal API; use sparingly and avoid exposing it in public APIs.
+
 ### Rule: Closure-convert functions that cross JIT/AD boundaries
 - Do: Use `eqx.filter_closure_convert` for functions passed into operators/solvers.
 - Don’t: Capture model parameters in a closure while passing only `y` to the solver.
@@ -97,6 +124,21 @@ class MySolver(AbstractSolver):
         ...
 ```
 - Allowed break: Non-Equinox code or one-off prototypes.
+
+### Rule: Mark control-flow metadata as static
+- Do: Use `eqx.field(static=True)` for non-array metadata that influences control flow.
+- Don’t: Pass control flags/dtypes as dynamic arrays.
+- Why: Prevents retracing and keeps control flow stable under JIT.
+- Example:
+```python
+import equinox as eqx
+import jax.numpy as jnp
+
+class Config(eqx.Module):
+    dtype: jnp.dtype = eqx.field(static=True)
+    max_steps: int = eqx.field(static=True)
+```
+- Allowed break: Prototypes where retracing is acceptable.
 
 ### Rule: Use `TypeVar`/`Generic` to express state types when needed
 - Do: Parameterize solver ABCs with `Generic[_State]` if state differs by solver.
@@ -139,19 +181,25 @@ state = eqx.combine(state_static, new_dyn)
 ```
 - Allowed break: Only outside JIT with an explicit re-jit boundary.
 
-### Rule: Use ShapeDtypeStruct for structure checks
-- Do: Compare structures via `jax.eval_shape`/`ShapeDtypeStruct`.
+### Rule: Use `eqx.filter_eval_shape` for structure checks
+- Do: Compare structures via `eqx.filter_eval_shape`/`ShapeDtypeStruct`.
 - Don’t: Infer structure from runtime values inside JIT.
 - Why: Structure checks must not execute numerics.
 - Example:
 ```python
-import jax
+import equinox as eqx
 import jax.tree_util as jtu
 
-struct = jax.eval_shape(lambda: y)
+struct = eqx.filter_eval_shape(lambda: y)
 assert jtu.tree_structure(struct) == jtu.tree_structure(expected_struct)
 ```
 - Allowed break: Small non-jitted utilities.
+
+### Rule: Avoid dummy arrays for structure checks
+- Do: Use `eqx.filter_eval_shape` instead of fabricated inputs.
+- Don’t: Construct fake arrays just to discover shapes/dtypes.
+- Why: Avoids accidental device work and keeps structure checks pure.
+- Allowed break: Tiny scripts outside JIT.
 
 ### Rule: Preserve static outputs in control flow
 - Do: Wrap static outputs with `eqxi.Static` (or helper) inside `lax.cond`.
@@ -192,16 +240,30 @@ final = lax.while_loop(cond_fn, body_fn, init_state)
 - Allowed break: Small loops outside JIT.
 
 ### Rule: Use `eqx.filter_vmap` with explicit `in_axes`
-- Do: Batch solvers with explicit `in_axes` that keep static args static.
+- Do: Batch solvers with explicit `in_axes` that keep static args static, e.g. `eqx.if_array(0)`.
 - Don’t: Accidentally batch config/static fields.
 - Why: Prevents wrong broadcasting and retracing.
 - Example:
 ```python
 import equinox as eqx
 
-batched_solve = eqx.filter_vmap(solve, in_axes=(None, 0, None))
+batched_solve = eqx.filter_vmap(solve, in_axes=(None, eqx.if_array(0), None))
 ```
 - Allowed break: When the entire module is intentionally batched.
+
+### Rule: Prefer `eqx.filter_jit` with sharded inputs over `filter_pmap`
+- Do: Use sharded inputs with `eqx.filter_jit` for most parallelism.
+- Don’t: Reach for `filter_pmap` unless you need pmap-specific behavior.
+- Why: Equinox now recommends JIT + sharding for most cases.
+- Example:
+```python
+import equinox as eqx
+
+@eqx.filter_jit
+def step(state, batch):
+    ...
+```
+- Allowed break: Existing `pmap`-based code or explicit `axis_name` collectives.
 
 ### Rule: Avoid compiling heavy functions twice inside branches
 - Do: Use `lax.scan` or a shared subroutine when evaluating heavy functions multiple times.
@@ -241,6 +303,87 @@ keys = split_by_tree(key, output_shape_tree)
 out = jax.tree_util.tree_map(sample_leaf, keys, output_shape_tree)
 ```
 - Allowed break: Flat arrays with stable leaf ordering.
+
+## AD and checkpointing
+
+### Rule: Use Equinox AD wrappers for custom JVP/VJP
+- Do: Prefer `eqx.filter_custom_jvp`/`eqx.filter_custom_vjp` for custom AD on PyTrees.
+- Don’t: Use raw `jax.custom_*` and then manually manage static/dynamic leaves.
+- Why: Keeps PyTree filtering consistent with Equinox transformations.
+- Example:
+```python
+import equinox as eqx
+
+@eqx.filter_custom_jvp
+def f(x):
+    ...
+```
+- Allowed break: Non-Equinox functions that only accept plain arrays.
+
+### Rule: Prefer `eqx.filter_jvp`/`eqx.filter_vjp` for PyTrees
+- Do: Use Equinox AD wrappers for JVP/VJP on Module or PyTree inputs.
+- Don’t: Use raw `jax.jvp`/`jax.vjp` and then stitch static leaves by hand.
+- Why: Keeps static/dynamic partitioning aligned through AD transforms.
+- Example:
+```python
+import equinox as eqx
+
+def f(x):
+    ...
+
+value, tangents = eqx.filter_jvp(f, (x,), (tx,))
+```
+- Allowed break: Plain array functions.
+
+### Rule: Use `throw=True` in tangent solves when errors can't be routed
+- Do: Force `throw=True` inside tangent/JVP/VJP solves to avoid silent failures.
+- Don’t: Ignore solver failures in AD paths that have no result channel.
+- Why: There is no result channel for tangent failures.
+- Example:
+```python
+value, result, stats = linear_solve(..., throw=True)
+```
+- Allowed break: Explicitly tested research prototypes.
+
+### Rule: Use `eqx.filter_checkpoint` for long iterative pipelines
+- Do: Add `eqx.filter_checkpoint` in long iterative pipelines (e.g., scans) to trade compute for memory.
+- Don’t: Let large scans blow memory without a checkpointing strategy.
+- Why: Reduces peak memory in long sequence models or solvers.
+- Example:
+```python
+import equinox as eqx
+
+@eqx.filter_checkpoint
+def body(carry, x):
+    ...
+```
+- Allowed break: Short loops where memory is not a concern.
+
+### Rule: Use `jax.ensure_compile_time_eval` for enum logic
+- Do: Wrap tiny enum/predicate logic that must be static.
+- Don’t: Let dynamic enums leak into trace-only paths.
+- Why: Keeps control-flow predicates consistent under JIT.
+- Example:
+```python
+import jax
+
+with jax.ensure_compile_time_eval():
+    pred = is_successful(result)
+```
+- Allowed break: Non-jitted code paths.
+
+### Rule: Prefer `eqx.filter_pure_callback` for host callbacks
+- Do: Use `eqx.filter_pure_callback` for safe host callbacks with PyTrees, when callbacks are pure and JIT-compatible.
+- Don’t: Use raw `jax.pure_callback` with mixed static/dynamic leaves.
+- Why: Keeps callback inputs/outputs aligned with Equinox filtering.
+- Example:
+```python
+import equinox as eqx
+
+out = eqx.filter_pure_callback(fn, result_shape, arg)
+```
+- Allowed break: Pure JAX array-only callbacks.
+- Note: Avoid callbacks in transforms/backends that disallow them (e.g. some `jit`/`pmap`/`grad` contexts).
 
 ## Numerical stability and dtype policy
 
@@ -313,6 +456,21 @@ def _jvp(primals, tangents):
 # and use materialised zeros for missing tangents.
 ```
 - Allowed break: Research prototypes that intentionally skip AD.
+
+### Rule: Prefer Equinox primitive helpers when defining primitives
+- Do: Use `eqxi.filter_primitive_def`/`filter_primitive_jvp`/`filter_primitive_transpose`.
+- Don’t: Reimplement primitive registration without filtering static leaves.
+- Why: Keeps static/dynamic leaves consistent for AD and batching.
+- Example:
+```python
+import equinox.internal as eqxi
+
+@eqxi.filter_primitive_def
+def abstract_eval(...):
+    ...
+```
+- Allowed break: Pure array primitives with no static leaves.
+- Note: Advanced/internal usage only. These APIs may change; avoid depending on them in public libraries.
 
 ## Performance instrumentation and testing
 
