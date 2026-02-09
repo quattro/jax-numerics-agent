@@ -13,26 +13,49 @@ computing code: design rules, best practices, checklists, and copy‑paste snipp
 - A library or framework.
 - A replacement for upstream docs. This repo points at patterns and codifies rules.
 
-## How to use
-- Read `AGENTS.md` first for bootstrap guidance and source-of-truth pointers.
-- Use the skills files for deeper guidance.
-- Use checklists for reviews and pre‑merge sanity checks.
-- Use snippets as minimal, correct starting points.
+## Quick start
+
+### Local use (in this repo)
+1. Read `AGENTS.md` first for bootstrap guidance and source-of-truth pointers.
+2. Pick a skill entrypoint:
+   - Numerics patterns: `skills/jax_equinox_best_practices/SKILL.md`
+   - Engineering/CI/API policy: `skills/project_engineering/SKILL.md`
+3. Open companion checklists from `checklists/README.md`.
+4. Start from a snippet in `snippets/README.md`.
+5. Before finishing changes, run:
+   - `./scripts/validate_skill_links.sh`
 
 ## Install for Codex (global)
 If you want these skills available in every project, install them once into your
 Codex home directory (no project copies needed):
 
+Prerequisites:
+- `bash`
+- `rsync`
+
+Recommended default:
+- Use `./scripts/install_skills_with_assets.sh` to install skills plus portable
+  checklist/snippet assets.
+
 ```bash
-./scripts/install_skills.sh            # installs to ~/.codex/skills
+./scripts/install_skills.sh                                # skills only
 ./scripts/install_skills.sh /path/to/codex/home
-./scripts/install_skills_with_assets.sh            # installs skills + assets
+
+./scripts/install_skills_with_assets.sh                    # skills + assets
 ./scripts/install_skills_with_assets.sh /path/to/codex/home
+```
+
+Post-install verification:
+
+```bash
+ls ~/.codex/skills
+ls ~/.codex/skills/assets/checklists ~/.codex/skills/assets/snippets
 ```
 
 ## Project structure
 - `AGENTS.md` — bootstrap entrypoint and source-of-truth pointers.
-- `skills/jax_equinox_best_practices/SKILL.md` — numerics‑focused patterns (JIT, PyTrees, AD, RNG, stability).
+- `skills/jax_equinox_best_practices/SKILL.md` — compact numerics entrypoint + reference map.
+- `skills/jax_equinox_best_practices/references/` — detailed numerics guidance split by topic.
 - `skills/project_engineering/SKILL.md` — API stability, docs, pyproject, typing, CLI, CI, serialization.
 - `checklists/` — targeted checklists for design, JIT/static, numerics/AD/testing, linear algebra, engineering.
 - `snippets/` — ready‑to‑paste code templates.

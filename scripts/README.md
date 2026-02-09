@@ -3,10 +3,20 @@
 Utility scripts for installing skills globally.
 
 ## Validate skill links
-Validates that `checklists/*` and `snippets/*` references in `skills/*/SKILL.md` point to files that exist in this repo.
+Validates that `checklists/*`, `snippets/*`, and `references/*` links in markdown
+files under `skills/` point to files that exist in this repo. Relative links are
+resolved from the current markdown file's directory.
 
 ```bash
 ./validate_skill_links.sh
+```
+
+## Enforce SKILL.md line budget
+Checks top-level `skills/*/SKILL.md` files against a maximum line count (default: 500).
+
+```bash
+./check_skill_entrypoint_line_budget.sh
+./check_skill_entrypoint_line_budget.sh 500
 ```
 
 ## Install skills only

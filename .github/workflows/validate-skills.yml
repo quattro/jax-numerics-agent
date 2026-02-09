@@ -7,6 +7,7 @@ on:
       - "checklists/**"
       - "snippets/**"
       - "scripts/validate_skill_links.sh"
+      - "scripts/check_skill_entrypoint_line_budget.sh"
       - ".github/workflows/validate-skills.yml"
   push:
     paths:
@@ -14,6 +15,7 @@ on:
       - "checklists/**"
       - "snippets/**"
       - "scripts/validate_skill_links.sh"
+      - "scripts/check_skill_entrypoint_line_budget.sh"
       - ".github/workflows/validate-skills.yml"
 
 jobs:
@@ -25,3 +27,6 @@ jobs:
 
       - name: Validate skill checklist/snippet links
         run: ./scripts/validate_skill_links.sh
+
+      - name: Enforce SKILL.md line budget
+        run: ./scripts/check_skill_entrypoint_line_budget.sh 500

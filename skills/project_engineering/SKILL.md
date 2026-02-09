@@ -200,9 +200,68 @@ if __name__ == "__main__":
 ```
 - Allowed break: Tiny scripts not shipped as part of the library.
 
+### Rule: Validate and normalize boundary inputs in `main()`
+- Do: Validate numeric ranges, enum-like flags (`dtype`, `device`), and path existence before calling numerics code.
+- Don’t: Let deep solver code surface basic user input errors.
+- Why: CLI is an external boundary; fail fast with actionable messages.
+- Example:
+```python
+def main(argv=None):
+    ...
+    args = parser.parse_args(argv)
+    if args.max_steps < 1:
+        parser.error("--max-steps must be >= 1")
+    return run(...)
+```
+- Allowed break: Internal scripts where all inputs are controlled by trusted code.
+
+### Rule: Define stable stdout/stderr and exit-code contracts
+- Do: Reserve `stdout` for primary results (plain text or `--json`) and route diagnostics/errors to `stderr`.
+- Do: Document exit-code semantics (for example: `0` success, `2` usage errors, `1` runtime/result failures).
+- Don’t: Mix logs with machine-readable output or rely on Python tracebacks as user-facing error UX.
+- Why: Scientific CLIs are often used in automation and shell pipelines.
+- Example:
+```python
+import json
+import sys
+
+if sol.result == RESULTS.successful:
+    print(json.dumps({"value": sol.value}))
+    return 0
+print(f"error: {RESULTS[sol.result]}", file=sys.stderr)
+return 1
+```
+- Allowed break: Purely interactive demos not intended for scripting.
+
 ### Rule: Make CLI outputs reproducible
-- Do: Expose seed/dtype/device flags and log versions.
-- Don’t: Hide randomness or backend choices.
+- Do: Expose seed/dtype/device flags, report package versions, and make the effective config inspectable.
+- Don’t: Hide randomness/backend choices or silently coerce dtype/device without visibility.
+
+### Rule: Keep configuration precedence explicit
+- Do: Define and document precedence (`defaults < config file < env vars < CLI flags`).
+- Don’t: Merge config sources implicitly or mutate process-global environment from command handlers.
+- Why: Deterministic config resolution is required for reproducible experiments.
+- Allowed break: Single-file tools with no config/env integration.
+
+### Rule: Prefer subcommands for distinct workflows
+- Do: Use subcommands (`solve`, `benchmark`, `check`) for distinct actions and keep each handler small.
+- Subrule: Use `argparse` argument groups inside each subcommand to cluster related options (for example: reproducibility, solver controls, output formatting).
+- Don’t: Put unrelated workflows behind one command with large flag matrices.
+- Why: Improves discoverability and avoids invalid flag combinations.
+- Example:
+```python
+sub = parser.add_subparsers(dest="cmd", required=True)
+solve = sub.add_parser("solve")
+sub.add_parser("benchmark")
+repro = solve.add_argument_group("Reproducibility")
+repro.add_argument("--seed", type=int, default=0)
+```
+- Allowed break: Single-purpose commands with one stable action.
+
+### Rule: Test CLI contracts directly
+- Do: Add tests for parse failures, `--help`, stdout/stderr separation, and exit-code mapping for success/failure paths.
+- Don’t: Assume library-level tests alone cover CLI behavior.
+- Why: CLI regressions are usually contract regressions, not numerical regressions.
 
 ## CI / Quality gates
 
