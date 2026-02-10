@@ -41,3 +41,27 @@ import jax.numpy as jnp
 x = eqx.error_if(x, ~jnp.isfinite(x), "nonfinite")
 ```
 - Allowed break: Exploratory runs where failures are intentionally ignored.
+
+### Rule: Prefer stability-aware primitives over naive chained formulas
+- Do: Use primitives with numerically stable implementations for cancellation/overflow-prone expressions.
+- Don’t: Build sensitive expressions from raw `exp`/`log`/`sqrt` compositions when a stable primitive exists.
+- Why: These primitives use scaling, branching, or fused kernels to reduce overflow/underflow and precision loss.
+- Common mappings:
+
+| Prefer | Instead of | Typical use |
+| --- | --- | --- |
+| `jax.scipy.special.xlogy(x, y)` | `x * jnp.log(y)` | Cross-entropy and KL terms with `x == 0` cases |
+| `jax.scipy.special.xlog1py(x, y)` | `x * jnp.log1p(y)` | Stable `x * log(1 + y)` for small `y` |
+| `jnp.log1p(x)` | `jnp.log(1 + x)` | Small `x` near zero |
+| `jnp.expm1(x)` | `jnp.exp(x) - 1` | Small `x` near zero |
+| `jnp.logaddexp(a, b)` | `jnp.log(jnp.exp(a) + jnp.exp(b))` | Pairwise log-domain sums |
+| `jax.scipy.special.logsumexp(xs, axis=...)` | `jnp.log(jnp.sum(jnp.exp(xs), axis=...))` | Batched log-domain reductions |
+| `jax.nn.softplus(x)` | `jnp.log1p(jnp.exp(x))` | Stable smooth ReLU/logistic link |
+| `jax.nn.log_softmax(x, axis=...)` | `jnp.log(jax.nn.softmax(x, axis=...))` | Stable normalized log-probabilities |
+| `jax.nn.log_sigmoid(x)` | `jnp.log(jax.nn.sigmoid(x))` | Stable log-probabilities for Bernoulli/logit models |
+| `jax.scipy.special.entr(x)` | `-x * jnp.log(x)` | Entropy terms with `x -> 0` behavior |
+| `jax.scipy.special.rel_entr(x, y)` | `x * jnp.log(x / y)` | Relative entropy / KL terms |
+| `jax.scipy.special.gammaln(x)` | `jnp.log(jax.scipy.special.gamma(x))` | Log-gamma without overflow |
+| `jax.scipy.special.betaln(a, b)` | `jnp.log(jax.scipy.special.beta(a, b))` | Log-beta without overflow |
+| `jax.scipy.special.log_ndtr(x)` | `jnp.log(jax.scipy.special.ndtr(x))` | Stable Gaussian log-CDF in tail regions |
+
