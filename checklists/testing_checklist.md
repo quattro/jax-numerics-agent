@@ -13,6 +13,7 @@ Use this to validate correctness, AD, and batching behavior.
 - [ ] Validate result codes with `throw=False` where applicable.
 - [ ] Validate `throw=True` escalation behavior where applicable.
 - [ ] For vmapped solves, verify expected failure semantics (`throw=True` batch-fails vs `throw=False` per-item `result` inspection).
+- [ ] Boundary validation failures are tested explicitly (bad ranges/flags/paths fail before entering numerics kernels).
 - [ ] Include singular/ill-conditioned and nonfinite cases.
 
 ## AD checks
@@ -23,6 +24,7 @@ Use this to validate correctness, AD, and batching behavior.
 ## PyTree + static/dynamic behavior
 - [ ] Partition dynamic/static args in tests and recombine inside the function.
 - [ ] Confirm PyTree structure stability across iterations.
+- [ ] Verify table/dataframe adapters convert at boundaries and traced numerics run on arrays only.
 
 ## Performance regressions (smoke)
 - [ ] vmapped vs unbatched consistency.

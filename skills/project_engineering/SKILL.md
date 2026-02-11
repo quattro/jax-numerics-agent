@@ -58,10 +58,11 @@ return Solution(value=out, result=result, stats=stats, state=state)
 ```
 - Allowed break: Major version bump with migration guide.
 
-### Rule: Use structured results with a `RESULTS` enum and `Solution` container
-- Do: Define a `RESULTS` enum with human-readable messages and return a typed `Solution`.
-- Don’t: Return ad-hoc tuples or raise exceptions by default.
-- Why: Callers can handle failures deterministically and inspect stats/state.
+### Rule: Use structured results with a `RESULTS` enum and `Solution` container in core numerics APIs
+- Do: Define a `RESULTS` enum with human-readable messages and return a typed `Solution` from solver/core numerics entrypoints.
+- Do: Translate `Solution` into domain-specific outputs at user/product boundaries (for example CLI summaries or workflow-specific return objects).
+- Don’t: Expose `Solution` as the default UX for non-numerics public helpers that do not need solver-style status channels.
+- Why: Core numerics need deterministic failure channels, while user-facing surfaces should stay task-oriented.
 - Example:
 ```python
 class RESULTS(eqxi.Enumeration):
@@ -75,6 +76,16 @@ class Solution(eqx.Module):
     state: PyTree[Any]
 ```
 - Allowed break: Tiny internal helpers that are not part of the public API.
+
+### Rule: Keep one canonical entrypoint per workflow
+- Do: Route each workflow through one stable entrypoint and express variants through typed options/config.
+- Don’t: Add one-off public functions for special cases that should be flags or config on the canonical entrypoint.
+- Why: Extra entrypoints fragment behavior, docs, and compatibility guarantees.
+
+### Rule: Avoid trivial pass-through wrappers
+- Do: Add wrappers only when they add contract value (validation, normalization, compatibility, instrumentation, caching, or deprecation shims).
+- Don’t: Add one-line wrappers around core functionality with unchanged semantics.
+- Why: Thin wrappers increase API surface and maintenance cost without improving behavior.
 
 ### Rule: Treat `RESULTS` messages as the canonical error UX
 - Do: Write actionable, user-facing messages on each non-success result.
@@ -200,6 +211,12 @@ if __name__ == "__main__":
 ```
 - Allowed break: Tiny scripts not shipped as part of the library.
 
+### Rule: Validate early at boundaries; keep JITable kernels exception-free
+- Do: Validate ranges, enums, shape contracts, and file/path assumptions at boundary layers (CLI/public adapters) and raise actionable exceptions there.
+- Do: Inside traced numerics, use structured status channels (`RESULTS`, `throw` + `result.error_if`, `eqx.error_if`) instead of Python `raise`.
+- Don’t: Defer basic user-input validation to deep solver internals or raise Python exceptions inside JIT-compiled loops.
+- Why: Boundary failures should be immediate and clear; traced kernels require JAX-compatible error signaling.
+
 ### Rule: Validate and normalize boundary inputs in `main()`
 - Do: Validate numeric ranges, enum-like flags (`dtype`, `device`), and path existence before calling numerics code.
 - Don’t: Let deep solver code surface basic user input errors.
@@ -226,12 +243,18 @@ import json
 import sys
 
 if sol.result == RESULTS.successful:
-    print(json.dumps({"value": sol.value}))
+    sys.stdout.write(json.dumps({"value": sol.value}) + "\n")
     return 0
-print(f"error: {RESULTS[sol.result]}", file=sys.stderr)
+sys.stderr.write(f"error: {RESULTS[sol.result]}\n")
 return 1
 ```
 - Allowed break: Purely interactive demos not intended for scripting.
+
+### Rule: Route diagnostics through logging/callbacks, not ad-hoc prints
+- Do: Use structured logging and callback hooks for progress/diagnostics.
+- Do: Keep CLI-facing result/error emission aligned with the documented stdout/stderr contract.
+- Don’t: Use ad-hoc `print(...)` for diagnostics in library or CLI paths.
+- Why: Logging/callbacks are testable, filterable, and do not corrupt machine-readable output.
 
 ### Rule: Make CLI outputs reproducible
 - Do: Expose seed/dtype/device flags, report package versions, and make the effective config inspectable.
@@ -246,15 +269,20 @@ return 1
 ### Rule: Prefer subcommands for distinct workflows
 - Do: Use subcommands (`solve`, `benchmark`, `check`) for distinct actions and keep each handler small.
 - Subrule: Use `argparse` argument groups inside each subcommand to cluster related options (for example: reproducibility, solver controls, output formatting).
+- Subrule: Bind each subcommand with `set_defaults(func=...)` and dispatch once via `args.func(args)`.
 - Don’t: Put unrelated workflows behind one command with large flag matrices.
 - Why: Improves discoverability and avoids invalid flag combinations.
 - Example:
 ```python
 sub = parser.add_subparsers(dest="cmd", required=True)
 solve = sub.add_parser("solve")
-sub.add_parser("benchmark")
+solve.set_defaults(func=run_solve)
+bench = sub.add_parser("benchmark")
+bench.set_defaults(func=run_benchmark)
 repro = solve.add_argument_group("Reproducibility")
 repro.add_argument("--seed", type=int, default=0)
+args = parser.parse_args(argv)
+return args.func(args)
 ```
 - Allowed break: Single-purpose commands with one stable action.
 
@@ -273,6 +301,85 @@ repro.add_argument("--seed", type=int, default=0)
 ### Rule: Add regression tests for bug fixes
 - Do: Write a failing test first, then fix.
 - Don’t: Merge fixes without test coverage.
+
+## Pressure-test scenarios (for `testing-skills-with-subagents`)
+
+Use these prompts to validate compliance under pressure:
+
+1. Logging vs `print`
+```markdown
+IMPORTANT: This is a real scenario. Choose and act.
+
+Production logs are noisy. A teammate asks for a quick `print("step", i)` in solver code
+to debug a flaky issue before today's release.
+
+Options:
+A) Add `print(...)` in the solver loop.
+B) Add structured logging/callback diagnostics at boundaries and keep traced kernels print-free.
+C) Add `print(...)` now and remove it later.
+
+Choose A, B, or C.
+```
+
+2. Subcommand dispatch contract
+```markdown
+IMPORTANT: This is a real scenario. Choose and act.
+
+You are adding `benchmark` and `check` subcommands. A reviewer says direct `if args.cmd == ...`
+branches are faster to write than per-command handlers.
+
+Options:
+A) Keep one large `if/elif` dispatch block.
+B) Bind handlers with `set_defaults(func=...)` and dispatch with `args.func(args)`.
+C) Mix both patterns for now.
+
+Choose A, B, or C.
+```
+
+3. One-off API surface pressure
+```markdown
+IMPORTANT: This is a real scenario. Choose and act.
+
+A stakeholder requests `solve_fast_for_team_x()` with slightly different defaults.
+Release is in 2 hours.
+
+Options:
+A) Add the one-off public function.
+B) Extend the canonical entrypoint with explicit options/config and keep a single workflow entrypoint.
+C) Add one-off now and deprecate later.
+
+Choose A, B, or C.
+```
+
+4. Boundary validation vs traced exceptions
+```markdown
+IMPORTANT: This is a real scenario. Choose and act.
+
+Invalid `max_steps` sometimes reaches a jitted solver. A teammate suggests raising
+`ValueError` from inside the traced step function for simplicity.
+
+Options:
+A) Raise Python exceptions inside the jitted loop.
+B) Validate and raise at boundary layers; keep traced kernels on `RESULTS`/`error_if` channels.
+C) Leave it unvalidated and rely on downstream failures.
+
+Choose A, B, or C.
+```
+
+5. `Solution` scope pressure
+```markdown
+IMPORTANT: This is a real scenario. Choose and act.
+
+You have a non-numerics public helper that returns a user summary report.
+A teammate wants it to return internal `Solution` directly "for consistency".
+
+Options:
+A) Return `Solution` from every public helper.
+B) Keep `Solution` in core numerics and translate to domain outputs at user/product boundaries.
+C) Return `Solution` plus a summary string.
+
+Choose A, B, or C.
+```
 
 ## Serialization / checkpoints
 

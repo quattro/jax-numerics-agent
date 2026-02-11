@@ -18,6 +18,19 @@ if not jnp.issubdtype(x.dtype, jnp.inexact):
 ```
 - Allowed break: Safe scalar literals in trivial helpers.
 
+### Rule: Convert dataframe/tabular inputs at ingress
+- Do: Convert external table-like inputs (Polars/Pandas/DataFrame columns) to arrays before numerics (`to_jax()`, then `np.asarray(...)` where assignment into arrays happens).
+- Do: Keep internal numerics state as array/PyTree values only.
+- Don’t: Carry dataframe objects through traced functions or solver state.
+- Why: Host-side table containers are not stable traced values and often hide dtype/object conversions.
+- Example:
+```python
+# Boundary adapter
+x = np.asarray(df["x"].to_jax())
+y = np.asarray(df["y"].to_jax())
+```
+- Allowed break: Non-jitted reporting/IO layers.
+
 ### Rule: Guard divisions and norms; define stable JVPs
 - Do: Use `jnp.where` to avoid divide-by-zero; define stable custom JVPs for norms.
 - Don’t: Divide by quantities that can be zero or near-zero without guards.
@@ -42,6 +55,12 @@ x = eqx.error_if(x, ~jnp.isfinite(x), "nonfinite")
 ```
 - Allowed break: Exploratory runs where failures are intentionally ignored.
 
+### Rule: Raise Python exceptions at boundaries, not inside traced kernels
+- Do: Validate user/config input in boundary layers and raise actionable exceptions there.
+- Do: Use `eqx.error_if` or result-code channels inside traced numerics.
+- Don’t: Raise Python exceptions from JIT-compiled loops/steps.
+- Why: Boundary validation needs clear UX, while traced kernels need JAX-compatible control flow.
+
 ### Rule: Prefer stability-aware primitives over naive chained formulas
 - Do: Use primitives with numerically stable implementations for cancellation/overflow-prone expressions.
 - Don’t: Build sensitive expressions from raw `exp`/`log`/`sqrt` compositions when a stable primitive exists.
@@ -64,4 +83,3 @@ x = eqx.error_if(x, ~jnp.isfinite(x), "nonfinite")
 | `jax.scipy.special.gammaln(x)` | `jnp.log(jax.scipy.special.gamma(x))` | Log-gamma without overflow |
 | `jax.scipy.special.betaln(a, b)` | `jnp.log(jax.scipy.special.beta(a, b))` | Log-beta without overflow |
 | `jax.scipy.special.log_ndtr(x)` | `jnp.log(jax.scipy.special.ndtr(x))` | Stable Gaussian log-CDF in tail regions |
-

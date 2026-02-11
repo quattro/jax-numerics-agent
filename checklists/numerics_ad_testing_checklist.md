@@ -4,6 +4,8 @@ Use this for solver implementation and verification.
 
 ## Dtype and stability
 - [ ] Inputs are cast once to an inexact dtype at the boundary.
+- [ ] External tabular inputs (for example Polars/Pandas frames) are converted to JAX/NumPy arrays at ingress (`to_jax()`, `np.asarray(...)` at assignment boundaries).
+- [ ] Tabular/frame reconstruction happens only at egress adapters, never inside core numerics.
 - [ ] Dtype policy (x32/x64) is explicit and documented.
 - [ ] Divisions and norms are guarded against zero/inf.
 - [ ] Nonfinite values are detected early and surfaced predictably.
@@ -33,4 +35,5 @@ Use this for solver implementation and verification.
 ## Debugging
 - [ ] `eqx.error_if` is used for runtime errors inside JIT.
 - [ ] `jax.debug.print` is used for traced diagnostics.
+- [ ] Python exceptions are raised at boundary validation layers, not from traced solver kernels.
 - [ ] `EQX_ON_ERROR=breakpoint` is documented for runtime failures.

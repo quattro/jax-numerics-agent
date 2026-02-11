@@ -87,6 +87,12 @@ Use these snippets as implementation starters when they match the task.
 - Don’t: Mutate structure mid-loop or mix dtypes implicitly in hot paths.
 - Why: Structural and dtype drift causes retracing and numerical surprises.
 
+### Rule: Convert tabular/dataframe inputs at boundaries
+- Do: Convert Polars/Pandas/table-like inputs to JAX/NumPy arrays immediately at ingress (`to_jax()` and `np.asarray(...)` where values are assigned into arrays).
+- Do: Convert back to tabular formats only at egress adapters.
+- Don’t: Pass dataframe objects into `jit`/`vmap`/`scan` or core solver internals.
+- Why: Tabular containers are host-side objects that destabilize tracing, dtype policy, and reproducibility.
+
 ### Rule: Thread PRNG keys explicitly
 - Do: Accept/return keys, split deterministically, and fold in step identifiers.
 - Don’t: Use hidden global RNG state.
@@ -103,10 +109,50 @@ Use these snippets as implementation starters when they match the task.
 - Don’t: Assume convergence or silently ignore non-success statuses.
 - Why: Solver failures are normal control flow in numerics and must be explicit.
 
+### Rule: Raise early at boundaries; keep traced kernels exception-free
+- Do: Perform structural/range/input validation before entering the JIT boundary and raise actionable Python exceptions there.
+- Do: Inside traced numerics, use `result` channels and `eqx.error_if` for runtime checks.
+- Don’t: Raise Python exceptions from JIT-compiled loops or solver steps.
+- Why: Boundary validation should fail fast, while traced execution requires JAX-compatible control flow.
+
 ### Rule: Verify AD and batching behavior, not just primal outputs
 - Do: Test JVP/VJP vs finite differences under JIT and mapped execution.
 - Don’t: Treat successful forward values as sufficient verification.
 - Why: Most regressions in numerics show up first in gradients and batching semantics.
+
+## Pressure-test scenarios (for `testing-skills-with-subagents`)
+
+Use these prompts to harden boundary-conversion and exception-policy compliance:
+
+1. Dataframe ingress pressure
+```markdown
+IMPORTANT: This is a real scenario. Choose and act.
+
+You need to feed a Polars DataFrame into a jitted solver in 10 minutes.
+A teammate says "just pass the frame through and convert later if needed."
+
+Options:
+A) Pass the DataFrame through JIT and convert inside solver steps.
+B) Convert at ingress (`to_jax()` / `np.asarray(...)`) and keep traced numerics array-only.
+C) Convert half now and leave a DataFrame field in solver state.
+
+Choose A, B, or C.
+```
+
+2. Traced exception pressure
+```markdown
+IMPORTANT: This is a real scenario. Choose and act.
+
+Invalid values appear mid-iteration. It's tempting to `raise ValueError` directly from
+the jitted loop because it is the fastest patch.
+
+Options:
+A) Raise Python exceptions from the traced loop.
+B) Validate earlier at boundaries and use `result`/`eqx.error_if` inside traced numerics.
+C) Ignore and hope downstream checks catch it.
+
+Choose A, B, or C.
+```
 
 ## Reference map (load on demand)
 
