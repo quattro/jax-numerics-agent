@@ -19,15 +19,15 @@ if not jnp.issubdtype(x.dtype, jnp.inexact):
 - Allowed break: Safe scalar literals in trivial helpers.
 
 ### Rule: Convert dataframe/tabular inputs at ingress
-- Do: Convert external table-like inputs (Polars/Pandas/DataFrame columns) to arrays before numerics (`to_jax()`, then `np.asarray(...)` where assignment into arrays happens).
+- Do: Convert external table-like inputs (Polars/Pandas/DataFrame columns) to arrays before numerics (`to_jax()` if available, or `jnp.asarray(df.to_numpy())` where assignment into arrays happens).
 - Do: Keep internal numerics state as array/PyTree values only.
 - Don’t: Carry dataframe objects through traced functions or solver state.
 - Why: Host-side table containers are not stable traced values and often hide dtype/object conversions.
 - Example:
 ```python
 # Boundary adapter
-x = np.asarray(df["x"].to_jax())
-y = np.asarray(df["y"].to_jax())
+x = df["x"].to_jax()
+y = df["y"].to_jax()
 ```
 - Allowed break: Non-jitted reporting/IO layers.
 
